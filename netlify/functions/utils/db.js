@@ -1,4 +1,3 @@
-const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
 const { hashPassword, verifyPassword } = require('./auth');
 
@@ -6,21 +5,12 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'nuallakoko@gmail.com';
 
 function genId(prefix) { return prefix + crypto.randomUUID().slice(0, 12); }
 
-function generatePassword(len = 12) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let r = '';
-  const buf = crypto.randomBytes(len);
-  for (let i = 0; i < len; i++) r += chars[buf[i] % chars.length];
-  return r;
-}
-
 function defaultDB() {
-  const adminPw = '123456';
-  console.log(`[ARKX] First run — Admin: ${ADMIN_EMAIL} / Password: ${adminPw}`);
+  console.log(`[ARKX] First run — Admin: ${ADMIN_EMAIL} / Password: 123456`);
   return {
     users: [{
       id: genId('U'), name: 'Admin ARKX', email: ADMIN_EMAIL,
-      password: hashPassword(adminPw), role: 'admin', status: 'approved',
+      password: hashPassword('123456'), role: 'admin', status: 'approved',
       createdAt: new Date().toISOString()
     }],
     products: [
@@ -34,13 +24,7 @@ function defaultDB() {
     customers: [],
     sales: [],
     shifts: [],
-    settings: {
-      storeName: 'ARKX MART',
-      storeAddress: 'Jl. Merdeka No. 123, Jakarta',
-      storePhone: '0812-3456-7890',
-      footerNote: 'Terima kasih sudah berbelanja!',
-      logoUrl: ''
-    }
+    settings: { storeName: 'ARKX MART', storeAddress: 'Jl. Merdeka No. 123, Jakarta', storePhone: '0812-3456-7890', footerNote: 'Terima kasih sudah berbelanja!', logoUrl: '' }
   };
 }
 
@@ -59,23 +43,27 @@ let cachedDb = null;
 
 async function getDb() {
   if (cachedDb) return cachedDb;
-  const store = getStore({ name: 'arkx-kasir-db' });
-  const data = await store.get('db', { type: 'json' });
-  if (!data) {
-    cachedDb = defaultDB();
-    await saveDb(cachedDb);
-    return cachedDb;
+  try {
+    const { getStore } = require('@netlify/blobs');
+    const store = getStore({ name: 'arkx-kasir-db' });
+    const data = await store.get('db', { type: 'json' });
+    if (data) { cachedDb = migrate(data); return cachedDb; }
+  } catch (e) {
+    console.warn('[ARKX] Blobs not available, using in-memory');
   }
-  cachedDb = migrate(data);
+  cachedDb = defaultDB();
   return cachedDb;
 }
 
 async function saveDb(data) {
-  const store = getStore({ name: 'arkx-kasir-db' });
-  await store.set('db', JSON.stringify(data));
   cachedDb = data;
+  try {
+    const { getStore } = require('@netlify/blobs');
+    const store = getStore({ name: 'arkx-kasir-db' });
+    await store.set('db', JSON.stringify(data));
+  } catch (e) {
+    console.warn('[ARKX] Blobs save failed, in-memory only');
+  }
 }
 
-function invalidateCache() { cachedDb = null; }
-
-module.exports = { getDb, saveDb, genId, hashPassword, verifyPassword, defaultDB, migrate, invalidateCache, ADMIN_EMAIL };
+module.exports = { getDb, saveDb, genId, hashPassword, verifyPassword, defaultDB, migrate, ADMIN_EMAIL };
