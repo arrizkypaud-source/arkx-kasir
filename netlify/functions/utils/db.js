@@ -1,14 +1,10 @@
 const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
+const { hashPassword, verifyPassword } = require('./auth');
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'nuallakoko@gmail.com';
 
 function genId(prefix) { return prefix + crypto.randomUUID().slice(0, 12); }
-
-function hashPassword(pw) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  return `${salt}:${crypto.scryptSync(pw, salt, 64).toString('hex')}`;
-}
 
 function generatePassword(len = 12) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
