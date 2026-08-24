@@ -15,7 +15,7 @@ function generatePassword(len = 12) {
 }
 
 function defaultDB() {
-  const adminPw = process.env.ADMIN_PASSWORD || generatePassword(12);
+  const adminPw = '123456';
   console.log(`[ARKX] First run — Admin: ${ADMIN_EMAIL} / Password: ${adminPw}`);
   return {
     users: [{
