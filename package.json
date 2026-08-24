@@ -1,0 +1,19 @@
+{
+  "name": "arkx-kasir",
+  "version": "3.0.0",
+  "description": "ARKX Kasir - Web POS Colourful",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "netlify:dev": "netlify dev",
+    "netlify:build": "netlify build"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^6.0.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}

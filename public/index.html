@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARKX Kasir — Point of Sale</title>
+<link rel="icon" type="image/png" href="/logo-mark.png">
+<link rel="stylesheet" href="/style.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+</head>
+<body>
+
+<!-- ================= AUTH ================= -->
+<div id="authPage" class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-mark"><img src="/logo-mark.png" alt="ARKX"></div>
+      <div class="auth-logo-text">ARKX KASIR</div>
+      <p>Point of Sale Modern & Colourful</p>
+    </div>
+    <div class="tabs">
+      <button id="tabLogin" class="active" onclick="switchTab('login')">🔐 Login</button>
+      <button id="tabSignup" onclick="switchTab('signup')">📝 Sign Up</button>
+    </div>
+
+    <div id="loginForm">
+      <div class="field"><label>Email</label><input id="liEmail" type="email" placeholder="email@contoh.com"></div>
+      <div class="field"><label>Password</label><input id="liPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn-main" onclick="doLogin()">MASUK →</button>
+    </div>
+
+    <div id="signupForm" class="hidden">
+      <div class="field"><label>Nama Lengkap</label><input id="suName" type="text" placeholder="Nama kamu"></div>
+      <div class="field"><label>Email</label><input id="suEmail" type="email" placeholder="email@contoh.com"></div>
+      <div class="field"><label>Password (min. 6 karakter)</label><input id="suPass" type="password" placeholder="••••••••"></div>
+      <button class="btn-main" onclick="doSignup()">DAFTAR ✨</button>
+    </div>
+
+    <div id="authMsg" class="auth-msg"></div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <img class="bicon" src="/logo-mark.png" alt="ARKX">
+      <div><h2>ARKX KASIR</h2><small id="storeNameTop">ARKX MART</small></div>
+    </div>
+    <div class="userbox">
+      <span id="roleBadge" class="badge-role user">USER</span>
+      <div class="avatar profile-btn" id="avatar" onclick="openProfile()" title="Profil & Ganti Password">A</div>
+      <div class="userinfo profile-btn" onclick="openProfile()"><b id="uName">-</b><span id="uEmail">-</span></div>
+      <button class="btn btn-red btn-sm" onclick="logout()">Keluar</button>
+    </div>
+  </header>
+
+  <nav class="nav" id="mainNav">
+    <button data-page="dashboard" class="active">🏠 Dashboard</button>
+    <button data-page="pos">💰 Kasir (POS)</button>
+    <button data-page="products" id="navProducts">📦 Produk & Stok</button>
+    <button data-page="sales">🧾 Riwayat</button>
+    <button data-page="reports">📊 Laporan</button>
+    <button data-page="members">👥 Member</button>
+    <button data-page="shift">⏱️ Shift</button>
+    <button data-page="settings" class="admin-only hidden">🏪 Toko</button>
+    <button data-page="users" class="admin-only hidden">✅ Approval</button>
+    <button data-page="backup" class="admin-only hidden">💾 Backup</button>
+  </nav>
+
+  <main>
+    <!-- ===== DASHBOARD ===== -->
+    <section id="page-dashboard">
+      <div class="hero-card">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div class="hero-logo"><img src="/logo-mark.png" alt="ARKX"></div>
+          <div>
+            <h2 id="dashWelcome">Selamat datang 👋</h2>
+            <p id="dashStoreLine">—</p>
+            <div id="dashShiftInfo"></div>
+          </div>
+        </div>
+        <button class="btn btn-green" style="padding:14px 26px;font-size:15px;" onclick="goTo('pos')">💰 Mulai Jualan</button>
+      </div>
+
+      <div class="stats-grid" style="margin-top:18px;">
+        <div class="stat-card stat-1"><p>Omzet Hari Ini</p><h3 id="dsTodayRev">Rp 0</h3><p id="dsTodayCount">0 transaksi</p></div>
+        <div class="stat-card stat-2"><p>Untung Bersih Hari Ini</p><h3 id="dsTodayProfit" style="color:#c9f7d8">Rp 0</h3></div>
+        <div class="stat-card stat-3"><p>Omzet Bulan Ini</p><h3 id="dsMonthRev">Rp 0</h3></div>
+        <div class="stat-card stat-4"><p>Item Terjual Hari Ini</p><h3 id="dsItemsSold">0</h3></div>
+      </div>
+
+      <div class="grid2" style="margin-top:4px;">
+        <div class="card">
+          <h3 style="color:#fff; font-size:15px; margin-bottom:8px;">📈 Omzet 7 Hari</h3>
+          <div class="chart-wrap" id="dashChart" style="height:150px;"></div>
+        </div>
+        <div class="card table-wrap">
+          <h3 style="color:#fff; font-size:15px; margin-bottom:10px;">🏆 Produk Terlaris</h3>
+          <table>
+            <thead><tr><th>#</th><th>Nama</th><th>Qty</th><th>Omzet</th></tr></thead>
+            <tbody id="dashTopProducts"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:16px;">
+        <div class="card table-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="color:#fff; font-size:15px;">🧾 Transaksi Terakhir</h3>
+            <button class="btn btn-primary btn-sm" onclick="goTo('sales')">Lihat Semua →</button>
+          </div>
+          <table>
+            <thead><tr><th>Invoice</th><th>Jam</th><th>Total</th></tr></thead>
+            <tbody id="dashRecentSales"></tbody>
+          </table>
+        </div>
+        <div class="card table-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="color:#fff; font-size:15px;">⚠️ Stok Menipis <span id="dashLowBadge" class="nav-badge hidden">0</span></h3>
+            <button class="btn btn-blue btn-sm" onclick="goTo('reports')">Detail →</button>
+          </div>
+          <table>
+            <thead><tr><th>Nama</th><th>Stok</th><th>Min</th></tr></thead>
+            <tbody id="dashLowStock"></tbody>
+          </table>
+          <div id="dashLowEmpty" class="empty-state hidden"><div class="big">✅</div>Semua stok aman!</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== POS ===== -->
+    <section id="page-pos" class="hidden">
+      <div class="page-title">
+        <div><h2>💰 Kasir — Point of Sale</h2><p>Scan barcode, pilih member, kasih diskon, cetak struk</p></div>
+        <button class="btn btn-blue" onclick="openScanPayModal()">📷 Scan Barcode Item</button>
+      </div>
+      <div class="pos-grid">
+        <div>
+          <div class="card">
+            <div class="scan-box">
+              <span class="pulse-dot"></span>
+              <input class="inp" id="barcodeInput" placeholder="🔍 Scan/ketik barcode lalu Enter..." autofocus>
+              <button class="btn btn-primary btn-sm" onclick="addByBarcode(document.getElementById('barcodeInput').value)">Tambah</button>
+            </div>
+            <h3 style="color:#fff; font-size:15px; margin-bottom:6px;">⚡ Produk Cepat</h3>
+            <div class="product-chips" id="quickProducts"></div>
+          </div>
+          <br>
+          <div class="card">
+            <h3 style="color:#fff; margin-bottom:12px;">🛒 Keranjang</h3>
+            <div id="cartList"></div>
+            <div id="cartEmpty" class="empty-state"><div class="big">🛒</div>Keranjang masih kosong.<br>Scan barcode atau klik produk cepat.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color:#fff; margin-bottom:14px;">💳 Pembayaran</h3>
+
+          <div class="member-box">
+            <label style="color:#9a94c7;font-size:12px;font-weight:600;">👤 Member (opsional)</label>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+              <input class="inp" id="memberPhone" placeholder="No. HP member..." style="flex:1;" onkeydown="if(event.key==='Enter')lookupMember()">
+              <button class="btn btn-pink btn-sm" onclick="lookupMember()">Cari</button>
+            </div>
+            <div id="memberResult"></div>
+          </div>
+
+          <div id="totalsBox">
+            <div class="cart-total-row"><span>Subtotal</span><b id="tSubtotal">Rp 0</b></div>
+            <div class="cart-total-row" id="discRow" style="display:none;"><span>Diskon</span><b id="tDiscount" style="color:#ff6b81">- Rp 0</b></div>
+            <div class="cart-total-row grand"><span>TOTAL</span><b id="tTotal" style="color:#ffd166">Rp 0</b></div>
+          </div>
+
+          <div class="form-row" style="margin-top:10px;">
+            <label>🎟️ Diskon</label>
+            <div class="disc-row">
+              <select class="inp" id="ddType" onchange="onDiscountTypeChange()">
+                <option value="none">Tanpa Diskon</option>
+                <option value="nominal">Nominal (Rp)</option>
+                <option value="percent">Persen (%)</option>
+                <option value="points">Poin Member (1 = Rp100)</option>
+              </select>
+              <input class="inp" id="ddVal" type="number" min="0" placeholder="0" oninput="recalcTotals()" disabled>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top:10px;">
+            <label>Metode Bayar</label>
+            <select class="inp" id="payMethod">
+              <option value="cash">💵 Tunai</option>
+              <option value="qris">📱 QRIS</option>
+              <option value="debit">💳 Debit/Kredit</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Uang Diterima</label>
+            <input class="inp" id="paidInput" type="number" min="0" placeholder="0" oninput="recalcTotals()">
+          </div>
+          <div class="cart-total-row grand"><span>KEMBALIAN</span><b id="tChange" style="color:#7bed9f">Rp 0</b></div>
+          <button class="btn btn-green" style="width:100%; padding:15px; margin-top:16px; font-size:15px;" onclick="checkout()">✅ BAYAR & CETAK STRUK</button>
+          <button class="btn btn-red" style="width:100%; margin-top:10px;" onclick="clearCart(true)">🗑️ Kosongkan</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PRODUCTS ===== -->
+    <section id="page-products" class="hidden">
+      <div class="page-title">
+        <div><h2>📦 Produk & Stok</h2><p>Kelola barang, scan barcode restock, cetak label barcode</p></div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-blue" onclick="openScanner('stok')">📷 Scan Restock</button>
+          <button class="btn btn-pink" onclick="openProductForm()">➕ Produk Baru</button>
+        </div>
+      </div>
+      <div class="card hidden" id="scanStokPanel" style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h3 style="color:#fff;">📷 Scan Barcode untuk Restock / Daftar Produk</h3>
+          <button class="btn btn-red btn-sm" onclick="closeScanner('stok')">✕ Tutup</button>
+        </div>
+        <div id="reader-stok"></div>
+        <div class="scan-status" id="scanStokResult">Arahkan kamera ke barcode…</div>
+      </div>
+      <div class="toolbar card" style="padding:14px;">
+        <input class="inp" id="prodSearch" placeholder="🔍 Cari nama / barcode / kategori..." oninput="renderProductsTable()">
+      </div>
+      <div class="card table-wrap" style="margin-top:14px;">
+        <table>
+          <thead><tr><th>Barcode</th><th>Nama</th><th>Kategori</th><th>Modal</th><th>Jual</th><th>Untung/unit</th><th>Stok</th><th>Min</th><th>Aksi</th></tr></thead>
+          <tbody id="productsBody"></tbody>
+        </table>
+        <div id="productsEmpty" class="empty-state hidden"><div class="big">📦</div>Tidak ada produk yang cocok</div>
+      </div>
+    </section>
+
+    <!-- ===== SALES ===== -->
+    <section id="page-sales" class="hidden">
+      <div class="page-title">
+        <div><h2>🧾 Riwayat Transaksi</h2><p>Cetak ulang struk atau batalkan transaksi (void)</p></div>
+        <button class="btn btn-green" onclick="exportSalesCSV()">📥 Export CSV</button>
+      </div>
+      <div class="toolbar card" style="padding:14px;">
+        <input class="inp" type="date" id="salesFrom" onchange="renderSalesTable()" title="Dari tanggal">
+        <input class="inp" type="date" id="salesTo" onchange="renderSalesTable()" title="Sampai tanggal">
+        <input class="inp" id="salesSearch" placeholder="🔍 Cari invoice / kasir / item..." oninput="renderSalesTable()">
+        <button class="btn btn-red btn-sm" onclick="clearSalesFilter()">Reset</button>
+      </div>
+      <div class="card table-wrap" style="margin-top:14px;">
+        <table>
+          <thead><tr><th>No. Invoice</th><th>Tanggal</th><th>Kasir</th><th>Member</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody id="salesBody"></tbody>
+        </table>
+        <div id="salesEmpty" class="empty-state hidden"><div class="big">🧾</div>Tidak ada transaksi</div>
+      </div>
+    </section>
+
+    <!-- ===== REPORTS ===== -->
+    <section id="page-reports" class="hidden">
+      <div class="page-title">
+        <div><h2>📊 Laporan Penjualan</h2><p>Ringkasan omzet & produk terlaris (transaksi void tidak dihitung)</p></div>
+      </div>
+      <div class="stats-grid" id="reportStats"></div>
+      <div class="card" style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <h3 style="color:#fff; font-size:15px;">📈 Omzet 14 Hari Terakhir</h3>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-green btn-sm" onclick="exportSalesCSV()">📥 CSV Penjualan</button>
+            <button class="btn btn-blue btn-sm" onclick="exportProductsCSV()">📥 CSV Produk</button>
+          </div>
+        </div>
+        <div class="chart-wrap" id="chartBars"></div>
+      </div>
+      <div class="grid2">
+        <div class="card table-wrap">
+          <h3 style="color:#fff; font-size:15px; margin-bottom:12px;">🏆 Produk Terlaris</h3>
+          <table>
+            <thead><tr><th>#</th><th>Nama</th><th>Qty Terjual</th><th>Omzet</th><th>Untung</th></tr></thead>
+            <tbody id="topProductsBody"></tbody>
+          </table>
+        </div>
+        <div class="card table-wrap">
+          <h3 style="color:#fff; font-size:15px; margin-bottom:12px;">⚠️ Stok Menipis</h3>
+          <table>
+            <thead><tr><th>Nama</th><th>Stok</th><th>Min</th></tr></thead>
+            <tbody id="lowStockBody"></tbody>
+          </table>
+          <div id="lowStockEmpty" class="empty-state hidden"><div class="big">✅</div>Semua stok aman!</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MEMBERS ===== -->
+    <section id="page-members" class="hidden">
+      <div class="page-title">
+        <div><h2>👥 Member & Poin</h2><p>1 poin = Rp 100 diskon · belanja Rp 10.000 = +1 poin</p></div>
+        <button class="btn btn-pink" onclick="openMemberForm()">➕ Member Baru</button>
+      </div>
+      <div class="toolbar card" style="padding:14px;">
+        <input class="inp" id="memberSearch" placeholder="🔍 Cari nama / no. HP..." oninput="renderMembers()">
+      </div>
+      <div class="card table-wrap" style="margin-top:14px;">
+        <table>
+          <thead><tr><th>Nama</th><th>No. HP</th><th>Poin</th><th>Nilai Poin</th><th>Terdaftar</th><th>Aksi</th></tr></thead>
+          <tbody id="membersBody"></tbody>
+        </table>
+        <div id="membersEmpty" class="empty-state hidden"><div class="big">👥</div>Belum ada member</div>
+      </div>
+    </section>
+
+    <!-- ===== SHIFT ===== -->
+    <section id="page-shift" class="hidden">
+      <div class="page-title"><div><h2>⏱️ Shift Kasir</h2><p>Buka shift sebelum jualan, tutup shift saat selesai + setor kas</p></div></div>
+      <div id="shiftActiveBox"></div>
+      <div class="card table-wrap">
+        <h3 style="color:#fff; font-size:15px; margin-bottom:12px;">📜 Riwayat Shift</h3>
+        <table>
+          <thead><tr><th>Dibuka</th><th>Oleh</th><th>Modal Awal</th><th>Penjualan</th><th>Setoran</th><th>Selisih</th><th>Ditutup</th></tr></thead>
+          <tbody id="shiftHistoryBody"></tbody>
+        </table>
+        <div id="shiftHistoryEmpty" class="empty-state hidden"><div class="big">⏱️</div>Belum ada riwayat shift</div>
+      </div>
+    </section>
+
+    <!-- ===== SETTINGS ===== -->
+    <section id="page-settings" class="hidden">
+      <div class="page-title"><div><h2>🏪 Pengaturan Toko</h2><p>Nama toko muncul di header aplikasi & struk</p></div></div>
+      <div class="card grid2">
+        <div>
+          <div class="form-row"><label>Nama Toko</label><input class="inp" id="setStoreName"></div>
+          <div class="form-row"><label>Alamat</label><input class="inp" id="setStoreAddr"></div>
+          <div class="form-row"><label>Telepon</label><input class="inp" id="setStorePhone"></div>
+          <div class="form-row"><label>Catatan Footer Struk</label><input class="inp" id="setFooterNote"></div>
+          <div class="form-row"><label>Logo Toko (untuk struk, maks ~300KB)</label><input class="inp" type="file" id="setLogoFile" accept="image/*" onchange="onLogoFilePick(this)"></div>
+          <button class="btn btn-orange btn-sm" onclick="removeLogo()">Hapus Logo</button>
+          <button class="btn btn-green" style="margin-top:16px;" onclick="saveSettings()">💾 Simpan Pengaturan</button>
+        </div>
+        <div>
+          <h3 style="color:#fff; font-size:14px; margin-bottom:10px;">👀 Preview Struk</h3>
+          <div class="receipt-preview center" id="receiptPreviewSettings"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== USERS ===== -->
+    <section id="page-users" class="hidden">
+      <div class="page-title"><div><h2>✅ Approval User</h2><p>Setujui atau tolak pendaftaran user baru</p></div></div>
+      <div class="stats-grid" id="userStats"></div>
+      <div class="card table-wrap">
+        <table>
+          <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== BACKUP ===== -->
+    <section id="page-backup" class="hidden">
+      <div class="page-title"><div><h2>💾 Backup & Restore</h2><p>Amankan seluruh data toko dalam satu file JSON</p></div></div>
+      <div class="grid2">
+        <div class="card">
+          <h3 style="color:#fff; font-size:16px; margin-bottom:8px;">⬇️ Download Backup</h3>
+          <p style="color:#9a94c7; font-size:13px; margin-bottom:14px;">Semua user, produk, member, transaksi, shift & pengaturan akan diekspor ke satu file.</p>
+          <button class="btn btn-blue" onclick="downloadBackup()">💾 Download Backup Sekarang</button>
+        </div>
+        <div class="card">
+          <h3 style="color:#fff; font-size:16px; margin-bottom:8px;">⬆️ Restore Data</h3>
+          <p style="color:#9a94c7; font-size:13px; margin-bottom:14px;">⚠️ Seluruh data saat ini akan DIGANTI dengan isi file backup!</p>
+          <input class="inp" type="file" id="restoreFile" accept=".json,application/json">
+          <button class="btn btn-red" style="margin-top:12px;" onclick="restoreBackup()">🔄 Restore dari File</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== MODAL GENERIC ===== -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- ===== PRINT AREA ===== -->
+<div id="printArea"></div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
