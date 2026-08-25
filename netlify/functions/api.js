@@ -355,6 +355,48 @@ async function handleRoute(method, path, event, user) {
     });
   }
 
+  // LAPORAN PER KASIR
+  if (method === 'GET' && path === '/api/reports/cashiers') {
+    const d = await getDb();
+    const valid = d.sales.filter(s => s.status !== 'void');
+    const today = todayStr();
+    const monthPrefix = today.slice(0, 7);
+    const byCashier = {};
+    for (const s of valid) {
+      const key = s.cashier || 'Unknown';
+      byCashier[key] = byCashier[key] || { cashier: key, trxCount: 0, revenue: 0, profit: 0, itemsSold: 0, todayRevenue: 0, todayCount: 0, monthRevenue: 0, monthProfit: 0 };
+      const c = byCashier[key];
+      c.trxCount++;
+      c.revenue += s.total;
+      c.profit += Number(s.totalProfit || 0);
+      c.itemsSold += s.items.reduce((a, i) => a + i.qty, 0);
+      if (dayStr(s.date) === today) { c.todayRevenue += s.total; c.todayCount++; }
+      if (dayStr(s.date).startsWith(monthPrefix)) { c.monthRevenue += s.total; c.monthProfit += Number(s.totalProfit || 0); }
+    }
+    const cashiers = Object.values(byCashier).sort((a, b) => b.revenue - a.revenue);
+    return jsonResponse(200, { cashiers, generatedAt: new Date().toISOString() });
+  }
+
+  // STOK OPNAME — bulk update fisik stok
+  if (method === 'POST' && path === '/api/products/stock-opname') {
+    if (user.role !== 'admin') return jsonResponse(403, { message: 'Khusus admin' });
+    const d = await getDb();
+    const entries = body.items;
+    if (!Array.isArray(entries) || !entries.length) return jsonResponse(400, { message: 'Data opname kosong' });
+    const results = [];
+    for (const e of entries) {
+      const prod = d.products.find(x => x.id === e.id);
+      if (!prod) continue;
+      const physical = Math.max(0, Math.floor(Number(e.physical)));
+      if (!Number.isFinite(physical)) continue;
+      const diff = physical - prod.stock;
+      prod.stock = physical;
+      results.push({ id: prod.id, name: prod.name, systemBefore: prod.stock - diff, physical, diff });
+    }
+    await saveDb(d);
+    return jsonResponse(200, { message: `Stok opname selesai (${results.length} produk diupdate)`, results });
+  }
+
   // DASHBOARD
   if (method === 'GET' && path === '/api/dashboard') {
     const d = await getDb();

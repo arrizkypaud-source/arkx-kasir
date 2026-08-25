@@ -567,6 +567,46 @@ route('GET', '/api/reports', async (req, res) => {
   });
 }, { auth: true });
 
+// ================= LAPORAN PER KASIR =================
+route('GET', '/api/reports/cashiers', async (req, res) => {
+  const d = loadDB();
+  const valid = d.sales.filter(s => s.status !== 'void');
+  const today = todayStr();
+  const monthPrefix = today.slice(0, 7);
+  const byCashier = {};
+  for (const s of valid) {
+    const key = s.cashier || 'Unknown';
+    byCashier[key] = byCashier[key] || { cashier: key, trxCount: 0, revenue: 0, profit: 0, itemsSold: 0, todayRevenue: 0, todayCount: 0, monthRevenue: 0, monthProfit: 0 };
+    const c = byCashier[key];
+    c.trxCount++;
+    c.revenue += s.total;
+    c.profit += Number(s.totalProfit || 0);
+    c.itemsSold += s.items.reduce((a, i) => a + i.qty, 0);
+    if (dayStr(s.date) === today) { c.todayRevenue += s.total; c.todayCount++; }
+    if (dayStr(s.date).startsWith(monthPrefix)) { c.monthRevenue += s.total; c.monthProfit += Number(s.totalProfit || 0); }
+  }
+  json(res, 200, { cashiers: Object.values(byCashier).sort((a, b) => b.revenue - a.revenue), generatedAt: new Date().toISOString() });
+}, { auth: true });
+
+// ================= STOK OPNAME =================
+route('POST', '/api/products/stock-opname', async (req, res, p, body, user) => {
+  const d = loadDB();
+  const entries = body.items;
+  if (!Array.isArray(entries) || !entries.length) return json(res, 400, { message: 'Data opname kosong' });
+  const results = [];
+  for (const e of entries) {
+    const prod = d.products.find(x => x.id === e.id);
+    if (!prod) continue;
+    const physical = Math.max(0, Math.floor(Number(e.physical)));
+    if (!Number.isFinite(physical)) continue;
+    const before = prod.stock;
+    prod.stock = physical;
+    results.push({ id: prod.id, name: prod.name, systemBefore: before, physical, diff: physical - before });
+  }
+  await saveDB();
+  json(res, 200, { message: `Stok opname selesai (${results.length} produk diupdate)`, results });
+}, { auth: true, admin: true });
+
 // ================= DASHBOARD =================
 route('GET', '/api/dashboard', async (req, res) => {
   const d = loadDB();

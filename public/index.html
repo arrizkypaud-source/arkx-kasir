@@ -209,6 +209,7 @@
       <div class="page-title">
         <div><h2>📦 Produk & Stok</h2><p>Kelola barang, scan barcode restock, cetak label barcode</p></div>
         <div style="display:flex; gap:10px;">
+          <button class="btn btn-orange" onclick="openStockOpname()">📋 Stok Opname</button>
           <button class="btn btn-blue" onclick="openScanner('stok')">📷 Scan Restock</button>
           <button class="btn btn-pink" onclick="openProductForm()">➕ Produk Baru</button>
         </div>
@@ -269,6 +270,19 @@
           </div>
         </div>
         <div class="chart-wrap" id="chartBars"></div>
+      </div>
+      <div class="card" style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <h3 style="color:#fff; font-size:15px;">👤 Performa Kasir</h3>
+          <span style="color:#6a8aaa;font-size:11px;">Diurutkan dari omzet tertinggi</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Kasir</th><th>Transaksi</th><th>Item Terjual</th><th>Omzet Hari Ini</th><th>Omzet Bulan Ini</th><th>Total Omzet</th><th>Total Untung</th></tr></thead>
+            <tbody id="cashierReportBody"></tbody>
+          </table>
+          <div id="cashierReportEmpty" class="empty-state hidden"><div class="big">👤</div>Belum ada data kasir</div>
+        </div>
       </div>
       <div class="grid2">
         <div class="card table-wrap">

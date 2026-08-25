@@ -345,6 +345,52 @@ async function deleteProduct(id) {
   catch (e) { toast(e.message, 'err'); }
 }
 
+// ---------- STOK OPNAME ----------
+function openStockOpname() {
+  if (ME.role !== 'admin') return toast('Khusus admin', 'err');
+  if (!PRODUCTS.length) return toast('Belum ada produk', 'err');
+  showModal(`
+    <h3>📋 Stok Opname — Hitung Fisik</h3>
+    <p style="color:#6a8aaa;font-size:12px;margin-bottom:10px;">Isi jumlah fisik stok di rak. Kosongkan jika tidak dihitung.</p>
+    <div style="max-height:50vh; overflow-y:auto;">
+      ${PRODUCTS.map(p => `
+        <div class="cart-item" data-opname="${p.id}">
+          <div class="ci-info">
+            <div class="ci-name">${esc(p.name)}</div>
+            <div class="ci-price">Sistem: <b>${p.stock}</b></div>
+          </div>
+          <input class="inp" type="number" min="0" style="width:90px;" placeholder="${p.stock}" id="opn_${p.id}">
+        </div>`).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-red" onclick="closeModal()">Batal</button>
+      <button class="btn btn-green" onclick="submitStockOpname()">✅ Simpan Opname</button>
+    </div>`);
+}
+async function submitStockOpname() {
+  const items = [];
+  document.querySelectorAll('[data-opname]').forEach(row => {
+    const pid = row.getAttribute('data-opname');
+    const val = $('opn_' + pid).value;
+    if (val !== '') items.push({ id: pid, physical: Number(val) });
+  });
+  if (!items.length) return toast('Tidak ada yang diisi', 'err');
+  try {
+    const r = await api('/api/products/stock-opname', 'POST', { items });
+    closeModal();
+    const diffs = r.results.filter(x => x.diff !== 0);
+    let detail = diffs.length
+      ? '\n\nSelisih terdeteksi:\n' + diffs.map(x => `${x.name}: ${x.diff > 0 ? '+' : ''}${x.diff}`).join('\n')
+      : '\nSemua stok cocok dengan sistem.';
+    await loadProducts();
+    toast(r.message, 'ok');
+    showModal(`
+      <h3>📋 Hasil Stok Opname</h3>
+      <div class="receipt-preview" style="white-space:pre-wrap;">${esc(r.message)}${esc(detail)}</div>
+      <div class="modal-actions"><button class="btn btn-green" onclick="closeModal()">OK</button></div>`);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 // ---------- BARCODE LABEL PRINT ----------
 function printLabel(id) {
   const p = PRODUCTS.find(x => x.id === id);
@@ -768,6 +814,23 @@ async function loadReport() {
     $('lowStockBody').innerHTML = r.lowStock.map(p => `
       <tr class="lowstock-row"><td style="color:#fff">${esc(p.name)}</td><td>${p.stock}</td><td>${p.minStock}</td></tr>`).join('');
     $('lowStockEmpty').classList.toggle('hidden', r.lowStock.length > 0);
+
+    // laporan per kasir
+    try {
+      const cr = await api('/api/reports/cashiers');
+      $('cashierReportBody').innerHTML = cr.cashiers.map((c, i) => `
+        <tr>
+          <td>${['🥇', '🥈', '🥉'][i] || (i + 1)}</td>
+          <td style="color:#fff;font-weight:600">${esc(c.cashier)}</td>
+          <td>${c.trxCount} trx <span style="color:#6a8aaa">(${c.todayCount} hari ini)</span></td>
+          <td>${c.itemsSold} item</td>
+          <td style="color:#ffd166">${rupiah(c.todayRevenue)}</td>
+          <td style="color:#7dd3f8">${rupiah(c.monthRevenue)}</td>
+          <td style="color:#fff;font-weight:700">${rupiah(c.revenue)}</td>
+          <td style="color:#8ED350">+${rupiah(c.profit)}</td>
+        </tr>`).join('');
+      $('cashierReportEmpty').classList.toggle('hidden', cr.cashiers.length > 0);
+    } catch {}
   } catch (e) { toast(e.message, 'err'); }
 }
 function downloadCSV(filename, rows) {
