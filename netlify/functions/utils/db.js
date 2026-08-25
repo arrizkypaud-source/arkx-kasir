@@ -2,6 +2,10 @@ const crypto = require('crypto');
 const { hashPassword, verifyPassword } = require('./auth');
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'nuallakoko@gmail.com';
+const SITE_ID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+const BLOBS_TOKEN = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN || process.env.BLOBS_TOKEN;
+
+console.log('[ARKX] Blobs config:', { hasSiteId: !!SITE_ID, hasToken: !!BLOBS_TOKEN });
 
 function genId(prefix) { return prefix + crypto.randomUUID().slice(0, 12); }
 
@@ -42,41 +46,70 @@ function migrate(d) {
 }
 
 let cachedDb = null;
-let blobsAvailable = true;
+let blobsReady = null;
+
+async function initBlobs() {
+  if (blobsReady !== null) return blobsReady;
+  try {
+    const { getStore } = require('@netlify/blobs');
+    const opts = { name: 'arkx-kasir-db' };
+    if (SITE_ID && BLOBS_TOKEN) {
+      opts.siteID = SITE_ID;
+      opts.token = BLOBS_TOKEN;
+      console.log('[ARKX] Blobs: using explicit credentials');
+    } else {
+      console.log('[ARKX] Blobs: using auto-detect');
+    }
+    const store = getStore(opts);
+    const test = await store.get('db', { type: 'json' });
+    console.log('[ARKX] Blobs connected! Has data:', !!test);
+    blobsReady = { store, hasData: !!test };
+    return blobsReady;
+  } catch (e) {
+    console.error('[ARKX] Blobs init FAILED:', e.message);
+    blobsReady = false;
+    return false;
+  }
+}
 
 async function getDb() {
   if (cachedDb) return cachedDb;
 
-  if (blobsAvailable) {
+  const blobs = await initBlobs();
+  if (blobs && blobs.store) {
     try {
-      const { getStore } = require('@netlify/blobs');
-      const store = getStore({ name: 'arkx-kasir-db' });
-      const data = await store.get('db', { type: 'json' });
+      const data = await blobs.store.get('db', { type: 'json' });
       if (data) {
         cachedDb = migrate(data);
-        console.log('[ARKX] DB loaded from Blobs');
+        console.log('[ARKX] DB loaded from Blobs, products:', cachedDb.products.length);
         return cachedDb;
       }
     } catch (e) {
-      console.warn('[ARKX] Blobs not available:', e.message);
-      blobsAvailable = false;
+      console.error('[ARKX] Blobs read error:', e.message);
     }
   }
 
-  console.log('[ARKX] Using in-memory DB (data will reset on cold start)');
   cachedDb = defaultDB();
+  if (blobs && blobs.store) {
+    try {
+      await blobs.store.set('db', JSON.stringify(cachedDb));
+      console.log('[ARKX] Default DB saved to Blobs');
+    } catch (e) {
+      console.error('[ARKX] Blobs save error:', e.message);
+    }
+  }
   return cachedDb;
 }
 
 async function saveDb(data) {
   cachedDb = data;
-  if (blobsAvailable) {
+  const blobs = await initBlobs();
+  if (blobs && blobs.store) {
     try {
-      const { getStore } = require('@netlify/blobs');
-      const store = getStore({ name: 'arkx-kasir-db' });
-      await store.set('db', JSON.stringify(data));
+      await blobs.store.set('db', JSON.stringify(data));
+      console.log('[ARKX] DB saved to Blobs, products:', data.products.length);
     } catch (e) {
-      console.warn('[ARKX] Blobs save failed:', e.message);
+      console.error('[ARKX] Blobs save error:', e.message);
     }
   }
 }
