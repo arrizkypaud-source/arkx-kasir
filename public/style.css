@@ -236,7 +236,7 @@ select.inp option { color: #222; }
 @media print {
   body * { visibility: hidden; }
   #printArea, #printArea * { visibility: visible; }
-  #printArea { position: fixed; left: 0; top: 0; width: 80mm; }
+  #printArea { position: fixed; left: 0; top: 0; width: 80mm; display: block !important; }
 }
 #printArea { display: none; }
 

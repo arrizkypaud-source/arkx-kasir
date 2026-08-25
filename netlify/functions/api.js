@@ -11,8 +11,10 @@ const EARN_PER = 10000;
 
 // ---------- rate limiter ----------
 const rateBuckets = new Map();
+let lastCleanup = Date.now();
 function rateLimit(key, maxReqs = 5, windowMs = 60000) {
   const now = Date.now();
+  if (now - lastCleanup > 300000) { for (const [k, v] of rateBuckets) { if (now - v.start > 300000) rateBuckets.delete(k); } lastCleanup = now; }
   let bucket = rateBuckets.get(key);
   if (!bucket || now - bucket.start > windowMs) { bucket = { start: now, count: 0 }; rateBuckets.set(key, bucket); }
   bucket.count++;
@@ -212,7 +214,11 @@ async function handleRoute(method, path, event, user) {
     const c = d.customers.find(x => x.id === id);
     if (!c) return jsonResponse(404, { message: 'Member tidak ditemukan' });
     if (body.name) c.name = sanitizeStr(body.name, 50);
-    if (body.phone) c.phone = sanitizeStr(body.phone, 20);
+    if (body.phone) {
+      const newPhone = sanitizeStr(body.phone, 20);
+      if (newPhone !== c.phone && d.customers.find(x => x.phone === newPhone)) return jsonResponse(400, { message: 'No. HP sudah dipakai member lain' });
+      c.phone = newPhone;
+    }
     if (body.points != null) c.points = Math.max(0, Math.floor(Number(body.points)));
     await saveDb(d);
     return jsonResponse(200, c);
@@ -264,7 +270,10 @@ async function handleRoute(method, path, event, user) {
     const paid = Number(body.paidAmount != null ? body.paidAmount : total);
     if (!Number.isFinite(paid)) return jsonResponse(400, { message: 'Nominal bayar tidak valid' });
     if (paid < total) return jsonResponse(400, { message: 'Uang bayar kurang dari total' });
-    for (const si of saleItems) d.products.find(x => x.barcode === si.barcode).stock -= si.qty;
+    for (const si of saleItems) {
+      const prod = d.products.find(x => x.barcode === si.barcode);
+      if (prod) prod.stock -= si.qty;
+    }
     let pointsEarned = 0;
     if (cust) { if (pointsUsed > 0) cust.points -= pointsUsed; pointsEarned = Math.floor(total / EARN_PER); cust.points += pointsEarned; }
     const curShift = d.shifts.find(s => s.status === 'open');
@@ -400,14 +409,14 @@ exports.handler = async (event, context) => {
   path = path.replace(/^\/\.netlify\/functions\/api/, '') || '/';
   if (!path.startsWith('/api/')) path = '/api' + path;
 
-  // Auth check (skip for login/signup/settings GET)
-  const publicRoutes = ['/api/login', '/api/signup', '/api/settings'];
+  // Auth check — only GET /api/settings, /api/login, /api/signup are public
+  const fullyPublic = method === 'GET' && ['/api/login', '/api/signup', '/api/settings'].includes(path);
   let user = null;
-  if (!publicRoutes.includes(path) || method !== 'GET') {
+  if (!fullyPublic) {
     const authHeader = event.headers?.authorization || '';
     const token = authHeader.replace('Bearer ', '');
     if (token) user = verifyToken(token);
-    if (!user && !publicRoutes.includes(path)) return jsonResponse(401, { message: 'Silakan login dulu' });
+    if (!user) return jsonResponse(401, { message: 'Silakan login dulu' });
   }
 
   try {

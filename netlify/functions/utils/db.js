@@ -47,6 +47,7 @@ function migrate(d) {
 
 let cachedDb = null;
 let blobsReady = null;
+let dbLoading = null;
 
 async function initBlobs() {
   if (blobsReady !== null) return blobsReady;
@@ -74,31 +75,37 @@ async function initBlobs() {
 
 async function getDb() {
   if (cachedDb) return cachedDb;
+  if (dbLoading) return dbLoading;
 
-  const blobs = await initBlobs();
-  if (blobs && blobs.store) {
-    try {
-      const data = await blobs.store.get('db', { type: 'json' });
-      if (data) {
-        cachedDb = migrate(data);
-        console.log('[ARKX] DB loaded from Blobs, products:', cachedDb.products.length);
-        return cachedDb;
+  dbLoading = (async () => {
+    const blobs = await initBlobs();
+    if (blobs && blobs.store) {
+      try {
+        const data = await blobs.store.get('db', { type: 'json' });
+        if (data) {
+          cachedDb = migrate(data);
+          console.log('[ARKX] DB loaded from Blobs, products:', cachedDb.products.length);
+          return cachedDb;
+        }
+      } catch (e) {
+        console.error('[ARKX] Blobs read error:', e.message);
       }
-    } catch (e) {
-      console.error('[ARKX] Blobs read error:', e.message);
     }
-  }
+    cachedDb = defaultDB();
+    if (blobs && blobs.store) {
+      try {
+        await blobs.store.set('db', JSON.stringify(cachedDb));
+        console.log('[ARKX] Default DB saved to Blobs');
+      } catch (e) {
+        console.error('[ARKX] Blobs save error:', e.message);
+      }
+    }
+    return cachedDb;
+  })();
 
-  cachedDb = defaultDB();
-  if (blobs && blobs.store) {
-    try {
-      await blobs.store.set('db', JSON.stringify(cachedDb));
-      console.log('[ARKX] Default DB saved to Blobs');
-    } catch (e) {
-      console.error('[ARKX] Blobs save error:', e.message);
-    }
-  }
-  return cachedDb;
+  const result = await dbLoading;
+  dbLoading = null;
+  return result;
 }
 
 async function saveDb(data) {

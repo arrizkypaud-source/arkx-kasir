@@ -116,6 +116,8 @@ function defaultDB() {
 }
 
 function migrate(d) {
+  if (!Array.isArray(d.users)) d.users = [];
+  if (!Array.isArray(d.products)) d.products = [];
   if (!d.customers) d.customers = [];
   if (!d.shifts) d.shifts = [];
   if (!d.settings) d.settings = {};

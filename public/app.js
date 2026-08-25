@@ -101,10 +101,12 @@ async function enterApp() {
   loadDashboard();
   if (ME.role === 'admin') loadUsers();
 
-  // auto-open shift reminder
+  // auto-open shift reminder (only once)
   api('/api/shifts/current').then(cur => {
-    if (!cur && !$('page-shift')) return;
-    if (!cur) setTimeout(() => toast('⏱️ Belum ada shift aktif. Buka shift di menu Shift.', 'err'), 1200);
+    if (!cur && !sessionStorage.getItem('shift_warned')) {
+      sessionStorage.setItem('shift_warned', '1');
+      setTimeout(() => toast('⏱️ Belum ada shift aktif. Buka shift di menu Shift.', 'err'), 1200);
+    }
   }).catch(() => {});
 }
 
@@ -426,6 +428,11 @@ function onDiscountTypeChange() {
   $('ddVal').disabled = t === 'none';
   if (t === 'points' && MEMBER_SELECTED) $('ddVal').value = MEMBER_SELECTED.points;
   recalcTotals();
+}
+function onPaymentMethodChange() {
+  const method = $('payMethod').value;
+  const { total } = cartTotals();
+  if (method !== 'cash') { $('paidInput').value = total; recalcTotals(); }
 }
 function recalcTotals() {
   const { subtotal } = cartTotals();
@@ -856,6 +863,7 @@ async function doOpenShift() {
 }
 function closeShiftModal() {
   api('/api/shifts/current').then(cur => {
+    if (!cur) { toast('Tidak ada shift aktif', 'err'); return; }
     const expected = cur.openingCash + cur.liveCash;
     showModal(`
       <h3>🔒 Tutup Shift</h3>
@@ -939,7 +947,7 @@ async function loadUsers() {
           ${u.email.toLowerCase() !== 'nuallakoko@gmail.com' ? `<button class="btn btn-red btn-sm" onclick="deleteUser('${u.id}')">🗑️</button>` : ''}
         </td>
       </tr>`).join('');
-  } catch {}
+  } catch (e) { toast('Gagal memuat data user: ' + e.message, 'err'); }
 }
 async function setUserStatus(id, status) {
   try {
@@ -956,6 +964,7 @@ async function deleteUser(id) {
 
 // ---------- BARCODE SCANNER ----------
 async function openScanner(mode) {
+  if (scanner) { try { await scanner.stop(); } catch {} scanner = null; }
   scannerMode = mode;
   const readerEl = mode === 'stok' ? 'reader-stok' : 'reader-pay';
   const resultEl = mode === 'stok' ? 'scanStokResult' : 'scanPayResult';
