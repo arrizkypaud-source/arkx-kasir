@@ -6,10 +6,10 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'nuallakoko@gmail.com';
 function genId(prefix) { return prefix + crypto.randomUUID().slice(0, 12); }
 
 function defaultDB() {
-  console.log(`[ARKX] First run — Admin: ${ADMIN_EMAIL} / Password: 123456`);
+  console.log(`[ARKX] Creating default DB — Admin: ${ADMIN_EMAIL}`);
   return {
     users: [{
-      id: genId('U'), name: 'Admin ARKX', email: ADMIN_EMAIL,
+      id: 'U_ADMIN', name: 'Admin ARKX', email: ADMIN_EMAIL,
       password: hashPassword('123456'), role: 'admin', status: 'approved',
       createdAt: new Date().toISOString()
     }],
@@ -41,45 +41,43 @@ function migrate(d) {
   return d;
 }
 
-function getBlobsStore() {
-  const { getStore } = require('@netlify/blobs');
-  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
-  const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN || process.env.BLOBS_TOKEN;
-  if (siteID && token) {
-    return getStore({ name: 'arkx-kasir-db', siteID, token });
-  }
-  return getStore({ name: 'arkx-kasir-db' });
-}
-
 let cachedDb = null;
+let blobsAvailable = true;
 
 async function getDb() {
   if (cachedDb) return cachedDb;
-  try {
-    const store = getBlobsStore();
-    const data = await store.get('db', { type: 'json' });
-    if (data) { cachedDb = migrate(data); return cachedDb; }
-  } catch (e) {
-    console.warn('[ARKX] Blobs read failed:', e.message);
+
+  if (blobsAvailable) {
+    try {
+      const { getStore } = require('@netlify/blobs');
+      const store = getStore({ name: 'arkx-kasir-db' });
+      const data = await store.get('db', { type: 'json' });
+      if (data) {
+        cachedDb = migrate(data);
+        console.log('[ARKX] DB loaded from Blobs');
+        return cachedDb;
+      }
+    } catch (e) {
+      console.warn('[ARKX] Blobs not available:', e.message);
+      blobsAvailable = false;
+    }
   }
+
+  console.log('[ARKX] Using in-memory DB (data will reset on cold start)');
   cachedDb = defaultDB();
-  try {
-    const store = getBlobsStore();
-    await store.set('db', JSON.stringify(cachedDb));
-    console.log('[ARKX] Default DB saved to Blobs');
-  } catch (e) {
-    console.warn('[ARKX] Blobs initial save failed:', e.message);
-  }
   return cachedDb;
 }
 
 async function saveDb(data) {
   cachedDb = data;
-  try {
-    const store = getBlobsStore();
-    await store.set('db', JSON.stringify(data));
-  } catch (e) {
-    console.warn('[ARKX] Blobs save failed:', e.message);
+  if (blobsAvailable) {
+    try {
+      const { getStore } = require('@netlify/blobs');
+      const store = getStore({ name: 'arkx-kasir-db' });
+      await store.set('db', JSON.stringify(data));
+    } catch (e) {
+      console.warn('[ARKX] Blobs save failed:', e.message);
+    }
   }
 }
 
